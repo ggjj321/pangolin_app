@@ -3,6 +3,8 @@ package com.example.pangolin_app
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.KeyEvent.KEYCODE_DPAD_DOWN
+import android.view.KeyEvent.KEYCODE_DPAD_UP
 import android.view.MotionEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -45,9 +47,10 @@ class ClientSo(host: String, port: Int) : Socket(host, port) {
 
 
 class MainActivity : ComponentActivity() {
-    val host = "192.168.1.103"
-    val port = 12345
+    val host = "192.168.1.218"
+    val port = 8000
     private lateinit var client: ClientSo
+    var axisMap = mutableMapOf<String, Float?>()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -61,32 +64,49 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        axisMap["xAxis"] = 0.0f
+        axisMap["yAxis"] = 0.0f
+        axisMap["zAxis"] = 0.0f
+        axisMap["rzAxis"] = 0.0f
+
         Thread(Runnable {
             client = ClientSo(host, port)
         }).start()
+        Thread(Runnable { socketSend() }).start()
     }
 
+    fun socketSend() {
+        println("socket")
+        while (true){
+            val jsonAxis = Json.encodeToString(axisMap)
+            Thread.sleep(100)
+                    Thread(Runnable {
+                        client.sendData(jsonAxis)
+                    }).start()
+        }
+//        Thread(Runnable {
+//            client.sendData(jsonAxis)
+//        }).start()
+    }
+    @SuppressLint("RestrictedApi")
     override fun dispatchGenericMotionEvent(event: MotionEvent?): Boolean {
-        val xAxis: Float? = event?.getAxisValue(MotionEvent.AXIS_X)
-        val yAxis: Float? = event?.getAxisValue(MotionEvent.AXIS_Y)
         val zAxis: Float? = event?.getAxisValue(MotionEvent.AXIS_Z)
-        val rzAxis: Float? = event?.getAxisValue(MotionEvent.AXIS_RZ)
-        val rtriggerAxis : Float? = event?.getAxisValue(MotionEvent.AXIS_RTRIGGER)
-
-        val axisMap = mutableMapOf<String, Float?>()
-
-        axisMap["xAxis"] = xAxis
-        axisMap["yAxis"] = yAxis
         axisMap["zAxis"] = zAxis
-        axisMap["rzAxis"] = rzAxis
-        axisMap["rtriggerAxis"] = rtriggerAxis
-
-        val jsonAxis = Json.encodeToString(axisMap)
-        println(jsonAxis)
-        Thread(Runnable {
-                client.sendData(jsonAxis)
-            }).start()
         return super.dispatchGenericMotionEvent(event)
+    }
+    @SuppressLint("RestrictedApi")
+    override fun dispatchKeyEvent(event: KeyEvent?): Boolean {
+        if (event != null) {
+            if (event.keyCode == KEYCODE_DPAD_UP) {
+                if (event.action == MotionEvent.ACTION_DOWN) axisMap["yAxis"] = -1.0f
+                else if (event.action == MotionEvent.ACTION_UP) axisMap["yAxis"] = 0.0f
+            }
+            if (event.keyCode == KEYCODE_DPAD_DOWN) {
+                if (event.action == MotionEvent.ACTION_DOWN) axisMap["yAxis"] = 1.0f
+                else if (event.action == MotionEvent.ACTION_UP) axisMap["yAxis"] = 0.0f
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 }
 
